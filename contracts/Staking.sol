@@ -23,17 +23,10 @@ contract MoonChessStakin is ReentrancyGuard {
     uint256 public totalShares;
 
     // The period a user is timed out for after he withdraws
-    uint256 public timeoutPeriod = 90000;
+    uint256 public timeoutPeriod = 259200; // 3 days
 
     // Locks MCH
     function enter(uint256 _amount) public nonReentrant {
-        // Check if user is timed out
-        if (timeout[msg.sender] != 0) {
-            require(
-                block.timestamp >= timeout[msg.sender],
-                "You have just withdrawn and are still timed out"
-            );
-        }
         // Gets the amount of SHACK locked in the contract
         uint256 totalMCH = moonchessToken.balanceOf(address(this));
         // If this is the first/only staker, give shares equal to the amount of MCH Deposited
@@ -47,12 +40,19 @@ contract MoonChessStakin is ReentrancyGuard {
             shares[msg.sender] = what;
             totalShares += what;
         }
+        // Set timeout for user
+        timeout[msg.sender] = block.timestamp + timeoutPeriod;
         // Lock the MCH in the contract
         moonchessToken.transferFrom(msg.sender, address(this), _amount);
     }
 
     // Unlocks the staked + gained MCH and burns shares
     function leave(uint256 _share) public nonReentrant {
+        // Check if user is timed out
+        require(
+            block.timestamp >= timeout[msg.sender],
+            "You have just withdrawn and are still timed out"
+        );
         require(
             shares[msg.sender] >= _share,
             "You have tried to withdraw more shares than you have!"
@@ -62,7 +62,6 @@ contract MoonChessStakin is ReentrancyGuard {
             totalShares;
         shares[msg.sender] -= _share;
         totalShares -= _share;
-        timeout[msg.sender] = block.timestamp + timeoutPeriod;
         moonchessToken.transfer(msg.sender, what);
     }
 
